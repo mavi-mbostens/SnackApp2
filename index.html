@@ -187,8 +187,9 @@ const MENU = [
 const formatEUR = (amount) => '€' + amount.toFixed(2).replace('.', ',');
 
 const LOCK_HOUR = 11; // vanaf dit uur (lokale tijd) kan niemand meer bestellen/aanpassen
+const LOCK_DISABLED_FOR_TESTING = true; // <-- zet dit terug op false om de 11-uur-grens weer aan te zetten
 const todayStr = () => new Date().toDateString();
-const isLockedNow = () => new Date().getHours() >= LOCK_HOUR;
+const isLockedNow = () => !LOCK_DISABLED_FOR_TESTING && new Date().getHours() >= LOCK_HOUR;
 
 function App() {
   const [screen, setScreen] = useState('name'); // 'name' | 'menu' | 'all'
@@ -240,7 +241,6 @@ function App() {
         const data = await fetchRemote();
         const isNewDay = data.roundDate && data.roundDate !== todayStr();
         if (isNewDay) {
-          // Nieuwe dag: automatisch een schone lijst starten.
           setRound((data.round || 1) + 1);
           setOrders([]);
         } else {
@@ -252,14 +252,11 @@ function App() {
     })();
   }, []);
 
-  // Checkt elke minuut of het bestel-slot (voor LOCK_HOUR) gesloten moet worden,
-  // zodat de app ook automatisch afsluit zonder dat iemand hoeft te verversen.
   useEffect(() => {
     const interval = setInterval(() => setLocked(isLockedNow()), 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Debounced, centralized save: fires once per settled change instead of per click.
   useEffect(() => {
     if (loading || setupNeeded) return;
     if (skipNextSave.current) { skipNextSave.current = false; return; }
@@ -280,8 +277,6 @@ function App() {
     return () => clearTimeout(saveTimer.current);
   }, [round, orders, loading, setupNeeded]);
 
-  // Achtergrond-ververs: haalt periodiek de laatste stand op zodat je bestellingen
-  // van collega's ziet zonder te hoeven verversen. Detecteert ook een nieuwe dag.
   useEffect(() => {
     if (setupNeeded) return;
     const interval = setInterval(async () => {
@@ -368,7 +363,6 @@ function App() {
   const allTotal = orders.reduce((s, o) => s + o.qty, 0);
   const allPrice = orders.reduce((s, o) => s + (o.price || 0) * o.qty, 0);
 
-  // ---- SCREEN: name ----
   if (screen === 'name') {
     return (
       <div className="receipt">
@@ -395,7 +389,6 @@ function App() {
     );
   }
 
-  // ---- SCREEN: menu (home) ----
   if (screen === 'menu') {
     return (
       <div className="receipt">
@@ -450,7 +443,6 @@ function App() {
     );
   }
 
-  // ---- SCREEN: all ----
   const byPerson = orders.reduce((acc, o) => {
     (acc[o.name] = acc[o.name] || []).push(o);
     return acc;
